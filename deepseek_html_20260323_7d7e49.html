@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="tr" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gençtürk Mesai Takip</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Space+Mono:wght@400;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+
+    input[type="time"] {
+      font-family: 'Space Mono', monospace;
+    }
+
+    input[type="time"]::-webkit-calendar-picker-indicator {
+      filter: invert(1) brightness(0.7);
+      cursor: pointer;
+    }
+
+    .overtime-glow {
+      animation: pulseGlow 2.5s ease-in-out infinite;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 20px rgba(251, 146, 60, 0.15); }
+      50% { box-shadow: 0 0 35px rgba(251, 146, 60, 0.3); }
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .slide-up {
+      animation: slideUp 0.4s ease-out forwards;
+    }
+
+    @keyframes countUp {
+      from { opacity: 0; transform: scale(0.8); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .count-pop {
+      animation: countUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    .record-row {
+      animation: slideUp 0.3s ease-out forwards;
+    }
+
+    .toast-enter {
+      animation: slideUp 0.3s ease-out forwards;
+    }
+
+    .toast-exit {
+      animation: fadeOut 0.3s ease-in forwards;
+    }
+
+    @keyframes fadeOut {
+      from { opacity: 1; transform: translateY(0); }
+      to { opacity: 0; transform: translateY(-10px); }
+    }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="h-full bg-slate-950 text-slate-100 overflow-auto" style="font-family: 'DM Sans', sans-serif;">
+  <div id="app-wrapper" class="w-full h-full flex flex-col items-center p-4 sm:p-6 lg:p-8">
+    <!-- Toast container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2" style="pointer-events: none;"></div>
+
+    <!-- Header -->
+    <header class="w-full max-w-4xl mb-6 slide-up">
+      <div class="flex items-center gap-3 mb-1">
+        <div id="logo-icon" class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: #f97316;">
+          <i data-lucide="clock" style="width:22px;height:22px;color:#1e293b;"></i>
+        </div>
+        <h1 id="app-title" class="text-2xl sm:text-3xl font-bold tracking-tight" style="color: #f8fafc;">Gençtürk Mesai Takip</h1>
+      </div>
+      <p id="app-subtitle" class="text-sm mt-1" style="color: #64748b;">Günlük çalışma saatlerinizi takip edin</p>
+    </header>
+
+    <!-- Tabs navigation -->
+    <div class="w-full max-w-4xl mb-5 flex gap-2 border-b" style="border-color:#1e293b;">
+      <button onclick="switchTab('entry')" id="tab-entry" class="px-4 py-2.5 text-sm font-semibold uppercase tracking-wider transition-all" style="color:#64748b;border-bottom:2px solid transparent;border-color:#f97316;">
+        <i data-lucide="input" style="width:16px;height:16px;display:inline;margin-right:6px;"></i>Kayıt Gir
+      </button>
+      <button onclick="switchTab('calendar')" id="tab-calendar" class="px-4 py-2.5 text-sm font-semibold uppercase tracking-wider transition-all" style="color:#64748b;border-bottom:2px solid transparent;">
+        <i data-lucide="calendar" style="width:16px;height:16px;display:inline;margin-right:6px;"></i>Takvim
+      </button>
+      <button onclick="switchTab('report')" id="tab-report" class="px-4 py-2.5 text-sm font-semibold uppercase tracking-wider transition-all" style="color:#64748b;border-bottom:2px solid transparent;">
+        <i data-lucide="bar-chart-4" style="width:16px;height:16px;display:inline;margin-right:6px;"></i>Rapor
+      </button>
+    </div>
+
+    <!-- TAB: Entry -->
+    <div id="content-entry" class="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-5 gap-5">
+      <!-- LEFT: Input panel -->
+      <div class="lg:col-span-3 flex flex-col gap-5">
+        <div class="rounded-2xl p-5 sm:p-6 slide-up" style="background: #0f172a; border: 1px solid #1e293b; animation-delay: 0.05s;">
+          <div class="flex items-center gap-2 mb-5">
+            <i data-lucide="timer" style="width:18px;height:18px;color:#f97316;"></i>
+            <span class="text-sm font-semibold tracking-wide uppercase" style="color: #94a3b8;">Saat Girişi</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+            <div>
+              <label for="clock-in" id="clock-in-label" class="block text-xs font-medium mb-2 uppercase tracking-wider" style="color: #64748b;">Giriş Saati</label>
+              <div class="relative">
+                <input type="time" id="clock-in" value="08:00" class="w-full rounded-xl px-4 py-3 text-lg font-mono focus:outline-none focus:ring-2 transition-all" style="background: #1e293b; border: 1px solid #334155; color: #f8fafc; focus-ring-color: #f97316;">
+              </div>
+            </div>
+            <div>
+              <label for="clock-out" id="clock-out-label" class="block text-xs font-medium mb-2 uppercase tracking-wider" style="color: #64748b;">Çıkış Saati</label>
+              <div class="relative">
+                <input type="time" id="clock-out" value="18:00" class="w-full rounded-xl px-4 py-3 text-lg font-mono focus:outline-none focus:ring-2 transition-all" style="background: #1e293b; border: 1px solid #334155; color: #f8fafc;">
+              </div>
+            </div>
+          </div>
+          <div class="mb-5">
+            <label for="work-date" class="block text-xs font-medium mb-2 uppercase tracking-wider" style="color: #64748b;">Tarih</label>
+            <input type="date" id="work-date" class="w-full rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 transition-all" style="background: #1e293b; border: 1px solid #334155; color: #f8fafc; font-family: 'Space Mono', monospace;">
+          </div>
+          <div id="live-preview" class="rounded-xl p-4 mb-5" style="background: #1e293b; border: 1px solid #334155;">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <div class="flex items-center gap-2">
+                <i data-lucide="activity" style="width:16px;height:16px;color:#94a3b8;"></i>
+                <span class="text-sm" style="color: #94a3b8;">Toplam Çalışma:</span>
+                <span id="preview-total" class="text-lg font-bold font-mono" style="color: #f8fafc;">10s 00dk</span>
+              </div>
+              <div id="preview-overtime-wrap" class="flex items-center gap-2">
+                <span class="text-sm" style="color: #f97316;">Fazla Mesai:</span>
+                <span id="preview-overtime" class="text-lg font-bold font-mono" style="color: #f97316;">1s 00dk</span>
+              </div>
+            </div>
+          </div>
+          <button id="save-btn" onclick="handleSave()" class="w-full rounded-xl py-3.5 text-base font-semibold flex items-center justify-center gap-2 transition-all hover:brightness-110 active:scale-[0.98]" style="background: #f97316; color: #0f172a;">
+            <i data-lucide="save" style="width:18px;height:18px;"></i>
+            <span>Kaydet</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- RIGHT: Overtime display panel -->
+      <div class="lg:col-span-2 flex flex-col gap-5">
+        <div id="overtime-card" class="rounded-2xl p-5 sm:p-6 slide-up overtime-glow" style="background: linear-gradient(135deg, #431407 0%, #0f172a 60%); border: 1px solid #7c2d12; animation-delay: 0.1s;">
+          <div class="flex items-center gap-2 mb-3">
+            <i data-lucide="flame" style="width:20px;height:20px;color:#fb923c;"></i>
+            <span id="overtime-title" class="text-sm font-semibold tracking-wide uppercase" style="color: #fb923c;">Fazla Mesai</span>
+          </div>
+          <div id="overtime-display" class="text-center py-4">
+            <div id="overtime-hours" class="text-5xl sm:text-6xl font-bold font-mono count-pop" style="color: #fb923c; font-family: 'Space Mono', monospace;">
+              0<span class="text-2xl sm:text-3xl" style="color: #9a3412;">s</span> 00<span class="text-2xl sm:text-3xl" style="color: #9a3412;">dk</span>
+            </div>
+            <p class="text-xs mt-3 uppercase tracking-wider" style="color: #9a3412;">Son kayıt fazla mesai</p>
+          </div>
+          <div class="mt-3 pt-3" style="border-top: 1px solid #7c2d1244;">
+            <div class="flex items-center justify-between">
+              <span class="text-xs uppercase tracking-wider" style="color: #9a3412;">Bu ay toplam</span>
+              <span id="monthly-overtime" class="text-sm font-bold font-mono" style="color: #fb923c; font-family: 'Space Mono', monospace;">0s 00dk</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-2xl p-5 sm:p-6 slide-up" style="background: #0f172a; border: 1px solid #1e293b; animation-delay: 0.15s;">
+          <div class="flex items-center gap-2 mb-4">
+            <i data-lucide="bar-chart-3" style="width:18px;height:18px;color:#f97316;"></i>
+            <span class="text-sm font-semibold tracking-wide uppercase" style="color: #94a3b8;">Aylık Özet</span>
+          </div>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-sm" style="color: #64748b;">Toplam Kayıt</span>
+              <span id="stat-records" class="text-sm font-bold font-mono" style="color: #f8fafc;">0</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-sm" style="color: #64748b;">Toplam Çalışma</span>
+              <span id="stat-total" class="text-sm font-bold font-mono" style="color: #f8fafc;">0s 00dk</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-sm" style="color: #64748b;">Ort. Günlük</span>
+              <span id="stat-avg" class="text-sm font-bold font-mono" style="color: #f8fafc;">0s 00dk</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-sm" style="color: #fb923c;">Toplam Fazla Mesai</span>
+              <span id="stat-overtime" class="text-sm font-bold font-mono" style="color: #fb923c;">0s 00dk</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Calendar -->
+    <div id="content-calendar" class="w-full max-w-6xl" style="display:none;">
+      <div id="calendar-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+    </div>
+
+    <!-- TAB: Report -->
+    <div id="content-report" class="w-full max-w-6xl" style="display:none;">
+      <div id="report-container"></div>
+    </div>
+
+    <!-- Records list -->
+    <div class="w-full max-w-4xl mt-5 slide-up" style="animation-delay: 0.2s;">
+      <div class="rounded-2xl p-5 sm:p-6" style="background: #0f172a; border: 1px solid #1e293b;">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
+            <i data-lucide="list" style="width:18px;height:18px;color:#f97316;"></i>
+            <span class="text-sm font-semibold tracking-wide uppercase" style="color: #94a3b8;">Kayıtlar</span>
+          </div>
+          <span id="record-count" class="text-xs px-2 py-1 rounded-lg" style="background: #1e293b; color: #64748b;">0 kayıt</span>
+        </div>
+        <div id="records-list" class="space-y-2 max-h-96 overflow-y-auto pr-1">
+          <div id="empty-state" class="text-center py-10">
+            <i data-lucide="inbox" style="width:40px;height:40px;color:#334155;margin:0 auto;display:block;"></i>
+            <p class="text-sm mt-3" style="color: #475569;">Henüz kayıt yok</p>
+            <p class="text-xs mt-1" style="color: #334155;">Saat girişi yaparak başlayın</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete confirmation modal -->
+    <div id="delete-modal" class="fixed inset-0 z-40 flex items-center justify-center p-4" style="display:none; background: rgba(0,0,0,0.6);">
+      <div class="rounded-2xl p-6 w-full max-w-sm" style="background: #0f172a; border: 1px solid #1e293b;">
+        <div class="flex items-center gap-2 mb-3">
+          <i data-lucide="alert-triangle" style="width:20px;height:20px;color:#f97316;"></i>
+          <span class="text-lg font-semibold" style="color: #f8fafc;">Kaydı Sil</span>
+        </div>
+        <p class="text-sm mb-5" style="color: #94a3b8;">Bu kaydı silmek istediğinizden emin misiniz?</p>
+        <div class="flex gap-3">
+          <button onclick="cancelDelete()" class="flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all hover:brightness-110" style="background: #1e293b; color: #94a3b8; border: 1px solid #334155;">İptal</button>
+          <button onclick="confirmDelete()" class="flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all hover:brightness-110" style="background: #dc2626; color: #fff;">Sil</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---- State ----
+    let allRecords = [];
+    let pendingDeleteRecord = null;
+    let isSaving = false;
+
+    const WORK_DAY_MINUTES = 9 * 60; // 9 hours = 540 minutes
+
+    // ---- Default Config ----
+    const defaultConfig = {
+      app_title: 'Gençtürk Mesai Takip', // Brand name update
+      overtime_label: 'Fazla Mesai',
+      clock_in_label: 'Giriş Saati',
+      clock_out_label: 'Çıkış Saati',
+      monthly_goal_hours: 180,
+      background_color: '#0f172a',
+      surface_color: '#1e293b',
+      text_color: '#f8fafc',
+      primary_action_color: '#f97316',
+      secondary_action_color: '#64748b',
+      font_family: 'DM Sans',
+      font_size: 16
+    };
+
+    // ---- Helpers ----
+    function minutesToDisplay(mins) {
+      if (mins <= 0) return '0s 00dk';
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return `${h}s ${String(m).padStart(2, '0')}dk`;
+    }
+
+    function calcMinutesBetween(startStr, endStr) {
+      const [sh, sm] = startStr.split(':').map(Number);
+      const [eh, em] = endStr.split(':').map(Number);
+      let startMin = sh * 60 + sm;
+      let endMin = eh * 60 + em;
+      if (endMin <= startMin) endMin += 24 * 60;
+      return endMin - startMin;
+    }
+
+    function formatDate(dateStr) {
+      try {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric', weekday: 'short' });
+      } catch { return dateStr; }
+    }
+
+    function todayStr() {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function showToast(msg, type) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast-enter rounded-xl px-4 py-3 text-sm font-medium shadow-lg flex items-center gap-2';
+      toast.style.pointerEvents = 'auto';
+      const bgColor = type === 'success' ? '#166534' : type === 'error' ? '#991b1b' : '#1e293b';
+      const borderColor = type === 'success' ? '#22c55e' : type === 'error' ? '#dc2626' : '#334155';
+      toast.style.cssText = `background:${bgColor};border:1px solid ${borderColor};color:#f8fafc;`;
+      const icon = type === 'success' ? 'check-circle' : type === 'error' ? 'x-circle' : 'info';
+      toast.innerHTML = `<i data-lucide="${icon}" style="width:16px;height:16px;flex-shrink:0;"></i><span>${msg}</span>`;
+      container.appendChild(toast);
+      lucide.createIcons({ nameAttr: 'data-lucide' });
+      setTimeout(() => {
+        toast.className = toast.className.replace('toast-enter', 'toast-exit');
+        setTimeout(() => toast.remove(), 300);
+      }, 2500);
+    }
+
+    // ---- Live preview ----
+    function updateLivePreview() {
+      const clockIn = document.getElementById('clock-in').value;
+      const clockOut = document.getElementById('clock-out').value;
+      if (!clockIn || !clockOut) return;
+
+      const total = calcMinutesBetween(clockIn, clockOut);
+      const overtime = Math.max(0, total - WORK_DAY_MINUTES);
+
+      document.getElementById('preview-total').textContent = minutesToDisplay(total);
+      document.getElementById('preview-overtime').textContent = minutesToDisplay(overtime);
+      document.getElementById('preview-overtime-wrap').style.display = overtime > 0 ? 'flex' : 'none';
+    }
+
+    document.getElementById('clock-in').addEventListener('input', updateLivePreview);
+    document.getElementById('clock-out').addEventListener('input', updateLivePreview);
+
+    // ---- Save ----
+    async function handleSave() {
+      if (isSaving) return;
+
+      const clockIn = document.getElementById('clock-in').value;
+      const clockOut = document.getElementById('clock-out').value;
+      const workDate = document.getElementById('work-date').value;
+
+      if (!clockIn || !clockOut || !workDate) {
+        showToast('Lütfen tüm alanları doldurun', 'error');
+        return;
+      }
+
+      if (allRecords.length >= 999) {
+        showToast('Maksimum kayıt sayısına ulaşıldı (999)', 'error');
+        return;
+      }
+
+      const totalMinutes = calcMinutesBetween(clockIn, clockOut);
+      const overtimeMinutes = Math.max(0, totalMinutes - WORK_DAY_MINUTES);
+
+      isSaving = true;
+      const btn = document.getElementById('save-btn');
+      btn.innerHTML = '<span class="inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin"></span><span>Kaydediliyor...</span>';
+      btn.style.opacity = '0.7';
+      btn.disabled = true;
+
+      const result = await window.dataSdk.create({
+        date: workDate,
+        clock_in: clockIn,
+        clock_out: clockOut,
+        total_minutes: totalMinutes,
+        overtime_minutes: overtimeMinutes
+      });
+
+      isSaving = false;
+      btn.innerHTML = '<i data-lucide="save" style="width:18px;height:18px;"></i><span>Kaydet</span>';
+      btn.style.opacity = '1';
+      btn.disabled = false;
+      lucide.createIcons({ nameAttr: 'data-lucide' });
+
+      if (result.isOk) {
+        showToast('Kayıt başarıyla eklendi', 'success');
+      } else {
+        showToast('Kayıt eklenemedi, tekrar deneyin', 'error');
+      }
+    }
+
+    // ---- Delete ----
+    function requestDelete(record) {
+      pendingDeleteRecord = record;
+      document.getElementById('delete-modal').style.display = 'flex';
+    }
+
+    function cancelDelete() {
+      pendingDeleteRecord = null;
+      document.getElementById('delete-modal').style.display = 'none';
+    }
+
+    async function confirmDelete() {
+      if (!pendingDeleteRecord) return;
+      const rec = pendingDeleteRecord;
+      document.getElementById('delete-modal').style.display = 'none';
+
+      const result = await window.dataSdk.delete(rec);
+      pendingDeleteRecord = null;
+
+      if (result.isOk) {
+        showToast('Kayıt silindi', 'success');
+      } else {
+        showToast('Kayıt silinemedi', 'error');
+      }
+    }
+
+    // ---- Render records ----
+    function renderRecords(data) {
+      const container = document.getElementById('records-list');
+      const emptyState = document.getElementById('empty-state');
+      const sorted = [...data].sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.clock_in || '').localeCompare(a.clock_in || ''));
+
+      if (sorted.length === 0) {
+        [...container.children].forEach(child => {
+          if (child.id !== 'empty-state') child.remove();
+        });
+        emptyState.style.display = 'block';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+
+      const existingMap = new Map();
+      [...container.children].forEach(el => {
+        if (el.dataset.rid) existingMap.set(el.dataset.rid, el);
+      });
+
+      const currentIds = new Set(sorted.map(r => r.__backendId));
+
+      existingMap.forEach((el, id) => {
+        if (!currentIds.has(id)) el.remove();
+      });
+
+      sorted.forEach((record, idx) => {
+        const rid = record.__backendId;
+        const existing = existingMap.get(rid);
+        const hasOvertime = (record.overtime_minutes || 0) > 0;
+
+        const html = buildRecordHTML(record, hasOvertime);
+
+        if (existing) {
+          existing.innerHTML = html;
+        } else {
+          const row = document.createElement('div');
+          row.dataset.rid = rid;
+          row.className = 'record-row rounded-xl p-3 flex items-center justify-between gap-3 group';
+          row.style.cssText = 'background:#1e293b;border:1px solid #334155;';
+          row.innerHTML = html;
+          const children = [...container.children].filter(c => c.id !== 'empty-state');
+          if (idx < children.length) {
+            container.insertBefore(row, children[idx]);
+          } else {
+            container.appendChild(row);
+          }
+        }
+      });
+
+      container.querySelectorAll('[data-delete-id]').forEach(btn => {
+        btn.onclick = () => {
+          const rec = allRecords.find(r => r.__backendId === btn.dataset.deleteId);
+          if (rec) requestDelete(rec);
+        };
+      });
+
+      lucide.createIcons({ nameAttr: 'data-lucide' });
+    }
+
+    function buildRecordHTML(record, hasOvertime) {
+      return `
+        <div class="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
+          <div class="flex flex-col">
+            <span class="text-xs" style="color:#64748b;">${formatDate(record.date)}</span>
+            <span class="text-sm font-mono" style="color:#f8fafc;font-family:'Space Mono',monospace;">${record.clock_in} → ${record.clock_out}</span>
+          </div>
+          <div class="flex items-center gap-2 ml-auto flex-wrap">
+            <span class="text-xs px-2 py-1 rounded-lg" style="background:#0f172a;color:#94a3b8;">${minutesToDisplay(record.total_minutes)}</span>
+            ${hasOvertime ? `<span class="text-xs px-2 py-1 rounded-lg font-semibold" style="background:#431407;color:#fb923c;border:1px solid #7c2d12;">+${minutesToDisplay(record.overtime_minutes)}</span>` : ''}
+          </div>
+        </div>
+        <button data-delete-id="${record.__backendId}" class="opacity-50 hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-red-900/30" title="Sil">
+          <i data-lucide="trash-2" style="width:15px;height:15px;color:#dc2626;"></i>
+        </button>`;
+    }
+
+    // ---- Update stats ----
+    function updateStats(data) {
+      const count = data.length;
+      const totalMin = data.reduce((s, r) => s + (r.total_minutes || 0), 0);
+      const totalOvertime = data.reduce((s, r) => s + (r.overtime_minutes || 0), 0);
+      const avgMin = count > 0 ? Math.round(totalMin / count) : 0;
+
+      document.getElementById('stat-records').textContent = count;
+      document.getElementById('stat-total').textContent = minutesToDisplay(totalMin);
+      document.getElementById('stat-avg').textContent = minutesToDisplay(avgMin);
+      document.getElementById('stat-overtime').textContent = minutesToDisplay(totalOvertime);
+      document.getElementById('record-count').textContent = `${count} kayıt`;
+      document.getElementById('monthly-overtime').textContent = minutesToDisplay(totalOvertime);
+
+      const sorted = [...data].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      if (sorted.length > 0) {
+        const last = sorted[0];
+        const ot = last.overtime_minutes || 0;
+        const otH = Math.floor(ot / 60);
+        const otM = ot % 60;
+        document.getElementById('overtime-hours').innerHTML = `${otH}<span class="text-2xl sm:text-3xl" style="color:#9a3412;">s</span> ${String(otM).padStart(2, '0')}<span class="text-2xl sm:text-3xl" style="color:#9a3412;">dk</span>`;
+      } else {
+        document.getElementById('overtime-hours').innerHTML = '0<span class="text-2xl sm:text-3xl" style="color:#9a3412;">s</span> 00<span class="text-2xl sm:text-3xl" style="color:#9a3412;">dk</span>';
+      }
+    }
+
+    // ---- Element SDK ----
+    function applyConfig(config) {
+      const c = { ...defaultConfig, ...config };
+      const font = c.font_family || defaultConfig.font_family;
+      const baseSize = c.font_size || defaultConfig.font_size;
+      const baseFontStack = `${font}, 'DM Sans', sans-serif`;
+
+      document.getElementById('app-title').textContent = c.app_title || defaultConfig.app_title;
+      document.getElementById('overtime-title').textContent = c.overtime_label || defaultConfig.overtime_label;
+      document.getElementById('clock-in-label').textContent = c.clock_in_label || defaultConfig.clock_in_label;
+      document.getElementById('clock-out-label').textContent = c.clock_out_label || defaultConfig.clock_out_label;
+
+      document.body.style.background = c.background_color;
+
+      const surfaces = document.querySelectorAll('input[type="time"], input[type="date"], #live-preview, #record-count');
+      surfaces.forEach(el => {
+        el.style.background = c.surface_color;
+        el.style.borderColor = c.surface_color;
+      });
+
+      document.getElementById('app-title').style.color = c.text_color;
+
+      const primaryEls = [document.getElementById('save-btn'), document.getElementById('logo-icon')];
+      primaryEls.forEach(el => { if (el) el.style.background = c.primary_action_color; });
+
+      document.getElementById('app-subtitle').style.color = c.secondary_action_color;
+
+      document.body.style.fontFamily = baseFontStack;
+      document.getElementById('app-title').style.fontFamily = baseFontStack;
+      document.getElementById('app-title').style.fontSize = `${baseSize * 1.75}px`;
+      document.getElementById('app-subtitle').style.fontSize = `${baseSize * 0.85}px`;
+    }
+
+    window.elementSdk.init({
+      defaultConfig,
+      onConfigChange: async (config) => {
+        applyConfig(config);
+      },
+      mapToCapabilities: (config) => ({
+        recolorables: [
+          { get: () => config.background_color || defaultConfig.background_color, set: (v) => { config.background_color = v; window.elementSdk.setConfig({ background_color: v }); } },
+          { get: () => config.surface_color || defaultConfig.surface_color, set: (v) => { config.surface_color = v; window.elementSdk.setConfig({ surface_color: v }); } },
+          { get: () => config.text_color || defaultConfig.text_color, set: (v) => { config.text_color = v; window.elementSdk.setConfig({ text_color: v }); } },
+          { get: () => config.primary_action_color || defaultConfig.primary_action_color, set: (v) => { config.primary_action_color = v; window.elementSdk.setConfig({ primary_action_color: v }); } },
+          { get: () => config.secondary_action_color || defaultConfig.secondary_action_color, set: (v) => { config.secondary_action_color = v; window.elementSdk.setConfig({ secondary_action_color: v }); } }
+        ],
+        borderables: [],
+        fontEditable: {
+          get: () => config.font_family || defaultConfig.font_family,
+          set: (v) => { config.font_family = v; window.elementSdk.setConfig({ font_family: v }); }
+        },
+        fontSizeable: {
+          get: () => config.font_size || defaultConfig.font_size,
+          set: (v) => { config.font_size = v; window.elementSdk.setConfig({ font_size: v }); }
+        }
+      }),
+      mapToEditPanelValues: (config) => new Map([
+        ['app_title', config.app_title || defaultConfig.app_title],
+        ['overtime_label', config.overtime_label || defaultConfig.overtime_label],
+        ['clock_in_label', config.clock_in_label || defaultConfig.clock_in_label],
+        ['clock_out_label', config.clock_out_label || defaultConfig.clock_out_label],
+        ['monthly_goal_hours', String(config.monthly_goal_hours || defaultConfig.monthly_goal_hours)]
+      ])
+    });
+
+    // ---- Data SDK ----
+    (async () => {
+      const initResult = await window.dataSdk.init({
+        onDataChanged(data) {
+          allRecords = data;
+          renderRecords(data);
+          updateStats(data);
+        }
+      });
+
+      if (!initResult.isOk) {
+        showToast('Veri bağlantısı kurulamadı', 'error');
+      }
+    })();
+
+    // ---- Tab switching ----
+    function switchTab(tab) {
+      document.getElementById('content-entry').style.display = tab === 'entry' ? 'grid' : 'none';
+      document.getElementById('content-calendar').style.display = tab === 'calendar' ? 'block' : 'none';
+      document.getElementById('content-report').style.display = tab === 'report' ? 'block' : 'none';
+
+      ['entry', 'calendar', 'report'].forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        if (t === tab) {
+          btn.style.color = '#f97316';
+          btn.style.borderBottomColor = '#f97316';
+        } else {
+          btn.style.color = '#64748b';
+          btn.style.borderBottomColor = 'transparent';
+        }
+      });
+
+      if (tab === 'calendar') renderCalendar();
+      if (tab === 'report') renderReport();
+    }
+
+    // ---- Calendar Tab ----
+    function renderCalendar() {
+      const container = document.getElementById('calendar-grid');
+      container.innerHTML = '';
+
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
+
+      for (let m = 0; m < 12; m++) {
+        const year = currentMonth - m < 0 ? currentYear - 1 : currentYear;
+        const month = (currentMonth - m + 12) % 12;
+
+        const monthName = new Date(year, month).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
+
+        const monthCard = document.createElement('div');
+        monthCard.className = 'rounded-xl p-4';
+        monthCard.style.cssText = 'background:#0f172a;border:1px solid #1e293b;';
+
+        const monthHeader = document.createElement('div');
+        monthHeader.className = 'text-sm font-semibold mb-3 uppercase tracking-wider';
+        monthHeader.style.color = '#f97316';
+        monthHeader.textContent = monthName;
+        monthCard.appendChild(monthHeader);
+
+        const monthRecords = allRecords.filter(r => {
+          if (!r.date) return false;
+          const d = new Date(r.date);
+          return d.getFullYear() === year && d.getMonth() === month;
+        });
+
+        const totalWork = monthRecords.reduce((s, r) => s + (r.total_minutes || 0), 0);
+        const totalOT = monthRecords.reduce((s, r) => s + (r.overtime_minutes || 0), 0);
+
+        const statsDiv = document.createElement('div');
+        statsDiv.className = 'space-y-2 text-xs';
+        statsDiv.innerHTML = `
+          <div class="flex justify-between">
+            <span style="color:#64748b;">Kayıt:</span>
+            <span style="color:#f8fafc;font-weight:600;">${monthRecords.length}</span>
+          </div>
+          <div class="flex justify-between">
+            <span style="color:#64748b;">Çalışma:</span>
+            <span style="color:#f8fafc;font-weight:600;">${minutesToDisplay(totalWork)}</span>
+          </div>
+          <div class="flex justify-between">
+            <span style="color:#fb923c;">Fazla Mesai:</span>
+            <span style="color:#fb923c;font-weight:600;">${minutesToDisplay(totalOT)}</span>
+          </div>
+        `;
+        monthCard.appendChild(statsDiv);
+        container.appendChild(monthCard);
+      }
+      lucide.createIcons();
+    }
+
+    // ---- Report Tab ----
+    function renderReport() {
+      const container = document.getElementById('report-container');
+      container.innerHTML = '';
+
+      const now = new Date();
+      const currentYear = now.getFullYear();
+
+      // Build monthly stats for last 12 months
+      const monthlyStats = [];
+      for (let m = 11; m >= 0; m--) {
+        const date = new Date(currentYear, now.getMonth() - m, 1);
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const monthName = date.toLocaleDateString('tr-TR', { month: 'short' });
+
+        const monthRecords = allRecords.filter(r => {
+          if (!r.date) return false;
+          const d = new Date(r.date);
+          return d.getFullYear() === year && d.getMonth() === month;
+        });
+
+        const totalWork = monthRecords.reduce((s, r) => s + (r.total_minutes || 0), 0);
+        const totalOT = monthRecords.reduce((s, r) => s + (r.overtime_minutes || 0), 0);
+        const workDays = monthRecords.length;
+
+        monthlyStats.push({
+          name: monthName,
+          workDays,
+          totalWork,
+          totalOT,
+          avgWork: workDays > 0 ? Math.round(totalWork / workDays) : 0
+        });
+      }
+
+      // Summary cards
+      const totalWork12 = monthlyStats.reduce((s, m) => s + m.totalWork, 0);
+      const totalOT12 = monthlyStats.reduce((s, m) => s + m.totalOT, 0);
+      const totalDays12 = monthlyStats.reduce((s, m) => s + m.workDays, 0);
+      const monthlyGoalMinutes = (window.elementSdk?.config?.monthly_goal_hours || defaultConfig.monthly_goal_hours || 180) * 60;
+      const currentMonthStats = monthlyStats[monthlyStats.length - 1] || { totalWork: 0 };
+      const goalProgress = Math.min(100, (currentMonthStats.totalWork / monthlyGoalMinutes) * 100);
+
+      const summaryDiv = document.createElement('div');
+      summaryDiv.className = 'grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6';
+      summaryDiv.innerHTML = `
+        <div class="rounded-xl p-4" style="background:#0f172a;border:1px solid #1e293b;">
+          <div class="text-xs uppercase tracking-wider mb-1" style="color:#64748b;">12 Ay Toplam</div>
+          <div class="text-lg font-bold font-mono" style="color:#f8fafc;font-family:'Space Mono',monospace;">${minutesToDisplay(totalWork12)}</div>
+        </div>
+        <div class="rounded-xl p-4" style="background:#0f172a;border:1px solid #1e293b;">
+          <div class="text-xs uppercase tracking-wider mb-1" style="color:#64748b;">Fazla Mesai</div>
+          <div class="text-lg font-bold font-mono" style="color:#fb923c;font-family:'Space Mono',monospace;">${minutesToDisplay(totalOT12)}</div>
+        </div>
+        <div class="rounded-xl p-4" style="background:#0f172a;border:1px solid #1e293b;">
+          <div class="text-xs uppercase tracking-wider mb-1" style="color:#64748b;">İş Günü</div>
+          <div class="text-lg font-bold font-mono" style="color:#f8fafc;font-family:'Space Mono',monospace;">${totalDays12}</div>
+        </div>
+        <div class="rounded-xl p-4" style="background:#0f172a;border:1px solid #1e293b;">
+          <div class="text-xs uppercase tracking-wider mb-1" style="color:#64748b;">Aylık Ort.</div>
+          <div class="text-lg font-bold font-mono" style="color:#f8fafc;font-family:'Space Mono',monospace;">${minutesToDisplay(Math.round(totalWork12 / 12))}</div>
+        </div>
+      `;
+      container.appendChild(summaryDiv);
+
+      // Goal progress bar
+      const goalDiv = document.createElement('div');
+      goalDiv.className = 'rounded-xl p-6 mb-6';
+      goalDiv.style.cssText = 'background:#0f172a;border:1px solid #1e293b;';
+      goalDiv.innerHTML = `
+        <div class="flex items-center justify-between mb-3">
+          <div class="text-sm font-semibold uppercase tracking-wider" style="color:#f97316;">📈 Bu Ay Hedef İlerleme</div>
+          <div class="text-sm font-mono" style="color:#f8fafc;font-family:'Space Mono',monospace;">${minutesToDisplay(currentMonthStats.totalWork)} / ${minutesToDisplay(monthlyGoalMinutes)}</div>
+        </div>
+        <div class="w-full bg-gray-800 rounded-full h-3 overflow-hidden" style="background:#1e293b;">
+          <div class="h-full transition-all duration-300" style="width:${goalProgress}%;background:${goalProgress >= 100 ? '#22c55e' : '#f97316'};"></div>
+        </div>
+        <div class="text-xs mt-2" style="color:#64748b;">${Math.round(goalProgress)}% tamamlandı</div>
+      `;
+      container.appendChild(goalDiv);
+
+      // Chart
+      const maxOT = Math.max(...monthlyStats.map(m => m.totalOT), 1);
+      const chartDiv = document.createElement('div');
+      chartDiv.className = 'rounded-xl p-6 mb-6';
+      chartDiv.style.cssText = 'background:#0f172a;border:1px solid #1e293b;';
+      const chartTitle = document.createElement('div');
+      chartTitle.className = 'text-sm font-semibold mb-4 uppercase tracking-wider';
+      chartTitle.style.color = '#f97316';
+      chartTitle.textContent = '📊 Aylık Fazla Mesai Grafiği';
+      chartDiv.appendChild(chartTitle);
+
+      const chartBars = document.createElement('div');
+      chartBars.className = 'flex items-end gap-2 h-48';
+      chartBars.style.cssText = 'align-items:flex-end;';
+      monthlyStats.forEach(m => {
+        const bar = document.createElement('div');
+        bar.className = 'flex-1 flex flex-col items-center gap-1';
+
+        const height = maxOT > 0 ? (m.totalOT / maxOT) * 100 : 0;
+
+        const barFill = document.createElement('div');
+        barFill.style.cssText = `width:100%;height:${height}%;background:#f97316;border-radius:4px 4px 0 0;transition:all 0.3s;cursor:pointer;`;
+        barFill.title = `${m.name}: ${minutesToDisplay(m.totalOT)}`;
+        barFill.onmouseover = () => { barFill.style.background = '#fb923c'; };
+        barFill.onmouseout = () => { barFill.style.background = '#f97316'; };
+
+        const label = document.createElement('div');
+        label.className = 'text-xs font-mono mt-1 w-full text-center';
+        label.style.cssText = 'color:#64748b;font-family:\'Space Mono\',monospace;';
+        label.textContent = m.name;
+
+        bar.appendChild(barFill);
+        bar.appendChild(label);
+        chartBars.appendChild(bar);
+      });
+      chartDiv.appendChild(chartBars);
+      container.appendChild(chartDiv);
+
+      // Monthly details table
+      const tableDiv = document.createElement('div');
+      tableDiv.className = 'rounded-xl p-6';
+      tableDiv.style.cssText = 'background:#0f172a;border:1px solid #1e293b;overflow-x:auto;';
+      const tableTitle = document.createElement('div');
+      tableTitle.className = 'text-sm font-semibold mb-4 uppercase tracking-wider';
+      tableTitle.style.color = '#f97316';
+      tableTitle.textContent = '📋 Aylık Detaylar';
+      tableDiv.appendChild(tableTitle);
+
+      const table = document.createElement('table');
+      table.style.cssText = 'width:100%;font-size:13px;';
+      table.innerHTML = `
+        <thead>
+          <tr style="border-bottom:1px solid #334155;">
+            <th style="text-align:left;padding:8px;color:#64748b;font-weight:600;font-family:'Space Mono',monospace;">Ay</th>
+            <th style="text-align:right;padding:8px;color:#64748b;font-weight:600;font-family:'Space Mono',monospace;">Gün</th>
+            <th style="text-align:right;padding:8px;color:#64748b;font-weight:600;font-family:'Space Mono',monospace;">Çalışma</th>
+            <th style="text-align:right;padding:8px;color:#fb923c;font-weight:600;font-family:'Space Mono',monospace;">Fazla Mesai</th>
+            <th style="text-align:right;padding:8px;color:#64748b;font-weight:600;font-family:'Space Mono',monospace;">Ort. Günlük</th>
+           </tr>
+        </thead>
+        <tbody>
+          ${monthlyStats.map(m => `
+            <tr style="border-bottom:1px solid #1e293b;color:#f8fafc;">
+              <td style="padding:8px;text-transform:capitalize;">${m.name}</td>
+              <td style="text-align:right;padding:8px;font-family:'Space Mono',monospace;">${m.workDays}</td>
+              <td style="text-align:right;padding:8px;font-family:'Space Mono',monospace;">${minutesToDisplay(m.totalWork)}</td>
+              <td style="text-align:right;padding:8px;color:#fb923c;font-family:'Space Mono',monospace;font-weight:600;">${minutesToDisplay(m.totalOT)}</td>
+              <td style="text-align:right;padding:8px;font-family:'Space Mono',monospace;">${minutesToDisplay(m.avgWork)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      `;
+      tableDiv.appendChild(table);
+      container.appendChild(tableDiv);
+      lucide.createIcons();
+    }
+
+    // ---- Init ----
+    document.getElementById('work-date').value = todayStr();
+    updateLivePreview();
+    switchTab('entry');
+    lucide.createIcons();
+  </script>
+</body>
+</html>
